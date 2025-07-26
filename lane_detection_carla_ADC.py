@@ -519,6 +519,67 @@ class World(object):
             color = random.choice(bp.get_attribute('color').recommended_values)
             bp.set_attribute('color', color)
         return bp
+    
+
+# ---- Lane post-processing helpers ------------------------------------------
+
+LANE_CLASS_ID = 6  # CARLA semantic seg: 6 = RoadLines
+
+def get_edge_image(bgr_image):
+    gray = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150)
+    edges_rgb = cv2.cvtColor(edges, cv2.COLOR_GRAY2RGB)
+    return edges_rgb
+
+def get_lane_masks_from_semantic(sem_image):
+    """
+    sem_image: uint8 (H,W,3) colored palette OR (H,W) single-channel ids.
+    Returns:
+        lanes_mask (uint8 0/255), lanes_rgb (RGB mask only)
+    """
+    if sem_image.ndim == 3:  # colored palette -> need ids
+        # Try to recover ids by using green channel or convert to grayscale – heuristic.
+        # Safer: keep original ids before convert(); if not available, skip.
+        # Here assume raw semantic sensor comes as ids BEFORE convert().
+        raise RuntimeError("Need raw semantic IDs. See note in _parse_image to keep 'ids_array'.")
+    else:
+        ids_array = sem_image
+    lanes_mask = (ids_array == LANE_CLASS_ID).astype(np.uint8) * 255
+    lanes_rgb = cv2.cvtColor(lanes_mask, cv2.COLOR_GRAY2RGB)
+    return lanes_mask, lanes_rgb
+
+def dilate_mask(mask, ksize=5, iterations=1):
+    kernel = np.ones((ksize, ksize), np.uint8)
+    return cv2.dilate(mask, kernel, iterations=iterations)
+
+# ---- Pygame rendering -------------------------------------------------------
+
+_pygame_screen = None
+def render_multiview(raw_rgb, sem_rgb, edge_rgb, lanes_rgb, improved_rgb):
+    """
+    All inputs: HxWx3 uint8 RGB
+    Shows them horizontally in one pygame window.
+    """
+    global _pygame_screen
+    h, w, _ = raw_rgb.shape
+    total_w = w * 5
+    if _pygame_screen is None:
+        pygame.display.set_caption("Lane Detection Views")
+        _pygame_screen = pygame.display.set_mode((total_w, h))
+
+    # Convert to pygame surfaces (pygame expects (W,H) order)
+    def to_surface(img):
+        return pygame.surfarray.make_surface(np.rot90(img, 1))  # rotate to match pygame orientation
+
+    surfaces = [to_surface(x) for x in [raw_rgb, sem_rgb, edge_rgb, lanes_rgb, improved_rgb]]
+
+    x_off = 0
+    for surf in surfaces:
+        _pygame_screen.blit(surf, (x_off, 0))
+        x_off += w
+
+    pygame.display.update()
+
 
 # ==============================================================================
 # -- CameraManager -------------------------------------------------------------
@@ -614,15 +675,49 @@ class CameraManager(object):
         
         
         # 500. save raw image
-        self._image_raw = array.copy()
-        #jeff
-        return
-        '''
-        array = array[:, :, ::-1]
-        self._surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-        if self._recording:
-            image.save_to_disk('_out/%08d' % image.frame_number)
-        '''
+        self._image_raw = array.copy()  # BGR
+
+        # ------------------------------------------------------------------
+        # Build all 5 images for visualization
+        # ------------------------------------------------------------------
+
+        # 1. Raw image (convert BGR -> RGB for pygame)
+        raw_rgb = cv2.cvtColor(self._image_raw, cv2.COLOR_BGR2RGB)
+
+        # Keep a copy of semantic IDs BEFORE convert(), if we are on that sensor
+        ids_array = None
+        if self._sensors[self._index][0] == 'sensor.camera.semantic_segmentation':
+            # image.convert() was already called to colorize. We need ids, so re-create them:
+            ids_array = np.frombuffer(image.raw_data, dtype=np.uint8)
+            ids_array = ids_array.reshape((image.height, image.width, 4))[:, :, 2]  # CARLA packs id in R?G? Here 2 works in 0.9.x
+            # NOTE: Depending on CARLA version, channel index might differ. Try [:,:,0] or [:,:,2].
+
+        # 2. Semantic segmentation (already color converted by CARLA with CityScapes palette)
+        sem_rgb = array.copy()  # already BGR
+        sem_rgb = cv2.cvtColor(sem_rgb, cv2.COLOR_BGR2RGB)
+
+        # 3. Edge detection (from raw)
+        edge_rgb = get_edge_image(self._image_raw)
+
+        # 4 & 5. Lane masks
+        if ids_array is not None:
+            lanes_mask, lanes_rgb = get_lane_masks_from_semantic(ids_array)
+        else:
+            # Fallback: simple color threshold on sem_rgb to approximate lane lines (white)
+            hsv = cv2.cvtColor(sem_rgb, cv2.COLOR_RGB2HSV)
+            white_mask = cv2.inRange(hsv, (0, 0, 200), (180, 40, 255))
+            lanes_mask = white_mask
+            lanes_rgb = cv2.cvtColor(white_mask, cv2.COLOR_GRAY2RGB)
+
+        improved_mask = dilate_mask(lanes_mask, ksize=5, iterations=1)
+        improved_rgb = cv2.cvtColor(improved_mask, cv2.COLOR_GRAY2RGB)
+
+        # 5. Show with pygame
+        render_multiview(raw_rgb, sem_rgb, edge_rgb, lanes_rgb, improved_rgb)
+
+        # Also keep the original surface if HUD uses it
+        self._surface = pygame.surfarray.make_surface(np.rot90(raw_rgb, 1))
+
 
 
 # ==============================================================================
