@@ -384,16 +384,64 @@ class HUD(object):
 
 
     def render(self, semantic_image, raw_image):
+        """Render the images on display.
+        
+        Parameters: semantic_image (numpy array): The semantic segmented image.
+        ray_image (numpy array): The raw image from the camera.
+
+        Returns:
+        tuple: Key pressed and the raw image
+        """
         if(raw_image is not None):
-
             cv2.imshow('Raw Image {}'.format(self.name), raw_image)
- 
+            cv2.imshow('Semantic Image {}'.format(self.name), semantic_image)
+            
+            mask = (semantic_image[:, :, 1] == 234).astype(float) * 255
+            mask_b = (semantic_image[:, :, 1] == 234).astype(np.uint8) * 255
 
+            mask = mask[:, :, np.newaxis]
+            mask_b = mask_b[:, :, np.newaxis]
+
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+
+            dilation = cv2.dilate(mask_b, kernel, iterations=1)
+            dilation = dilation[:, :, np.newaxis]
+
+            dilation = np.repeat(dilation, 3, axis=2)
+
+            mask2 = np.zeros_like(raw_image)
+
+            height, width, _ = raw_image.shape
+
+            hexagon = np.array([
+                [(0, height), 
+                 (0, int(height / 2) + 180),
+                 (int(width / 2), int(height / 2) - 10),
+                 (width, int(height / 2) + 100),
+                 (width, height)],
+            ])
+
+            mask2 - cv2.fillPoly(mask2, hexagon, 255)
+
+            masked_image = cv2.bitwise_and(dilation.astype(float), mask2.astype(float))
+
+            mask = np.repeat(mask, 3, axis=2)
+
+            gray_image = cv2.cvtColor(raw_image, cv2.COLOR_BGR2GRAY)
+            edges = cv2.Canny(semantic_image, 100, 200)
+
+            cv2.imshow('Gray Image {}'.format(self.name), gray_image)
+
+            cv2.imshow('Edge Detection Image {}'.format(self.name), edges)
+            cv2.imshow('Segmented Lanes {}'.format(self.name), mask_b)
+            cv2.imshow('Segmented Lanes Dilation {}'.format(self.name), dilation)
+            cv2.imshow('Hexagon Mask Shape {}'.format(self.name), mask2)
+            cv2.imshow('Hexagon Mask in action {}'.format(self.name), masked_image)
 
         key = cv2.waitKeyEx(30)
         if(key == 27):
             cv2.destroyAllWindows()
-        return (key), raw_image
+        return (key), masked_image
 
 
 # ==============================================================================
