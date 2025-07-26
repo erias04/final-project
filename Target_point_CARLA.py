@@ -174,19 +174,19 @@ class HUD(object):
 
         img_org = img_org.astype(np.uint8)
 
-        wrapped_img = self.wrap_image(img)
+        wraped_img = self.wrap_image(img)
 
-        histogram = self.get_hist(wrapped_img)
+        histogram = self.get_hist(wraped_img)
 
-        binary_warped = wrapped_img.copy()
+        binary_wraped = wraped_img.copy()
 
         midpoint = np.int(histogram.shape[0] / 2)
         leftx_base = np.argmax(histogram[:midpoint])
         rightx_base = np.argmax(histogram[midpoint:]) + midpoint
 
-        window_height = np.int(binary_warped.shape[0] / nwindows)
+        window_height = np.int(binary_wraped.shape[0] / nwindows)
 
-        nonzero = binary_warped.nonzero()
+        nonzero = binary_wraped.nonzero()
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
 
@@ -197,11 +197,11 @@ class HUD(object):
         right_lane_inds = []
 
         # Experimental: might not work
-        out_img = np.dstack((binary_warped, binary_warped, binary_warped)) if len(binary_warped.shape) == 2 else binary_warped.copy()
+        # out_img = np.dstack((binary_warped, binary_warped, binary_warped)) if len(binary_warped.shape) == 2 else binary_warped.copy()
 
         for window in range(nwindows):
-            win_y_low = binary_warped.shape[0] - (window + 1) * window_height
-            win_y_high = binary_warped.shape[0] - window * window_height
+            win_y_low = binary_wraped.shape[0] - (window + 1) * window_height
+            win_y_high = binary_wraped.shape[0] - window * window_height
             win_xleft_low = leftx_current - margin
             win_xleft_high = leftx_current + margin
             win_xright_low = rightx_current - margin
@@ -214,15 +214,12 @@ class HUD(object):
             right_lane_inds.append(good_right_inds)
 
             if draw_windows == True:
-                cv2.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high), (0, 255, 0), 3)
-                cv2.rectangle(out_img, (win_xright_low, win_y_low), (win_xright_high, win_y_high), (0, 255, 0), 3)
+                cv2.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high), (100, 255, 255), 3)
+                cv2.rectangle(out_img, (win_xright_low, win_y_low), (win_xright_high, win_y_high), (100, 255, 255), 3)
 
-            # left_lane_inds.append(good_left_inds)
-            # right_lane_inds.append(good_right_inds)
-
-            if(len(good_left_inds) > minipix):
+            if len(good_left_inds) > minipix:
                 leftx_current = np.int(np.mean(nonzerox[good_left_inds]))
-            if(len(good_right_inds) > minipix):
+            if len(good_right_inds) > minipix:
                 rightx_current = np.int(np.mean(nonzerox[good_right_inds]))
 
         left_lane_inds = np.concatenate(left_lane_inds)
@@ -245,6 +242,7 @@ class HUD(object):
             self.left_a.append(left_fit[0])
             self.left_b.append(left_fit[1])
             self.left_c.append(left_fit[2])
+
             self.right_a.append(right_fit[0])
             self.right_b.append(right_fit[1])
             self.right_c.append(right_fit[2])

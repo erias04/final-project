@@ -415,13 +415,13 @@ class HUD(object):
 
             hexagon = np.array([
                 [(0, height), 
-                 (0, int(height / 2) + 180),
+                 (0, int(height / 2) + 100),
                  (int(width / 2), int(height / 2) - 10),
                  (width, int(height / 2) + 100),
                  (width, height)],
             ])
 
-            mask2 - cv2.fillPoly(mask2, hexagon, 255)
+            mask2 = cv2.fillPoly(mask2, hexagon, 255)
 
             masked_image = cv2.bitwise_and(dilation.astype(float), mask2.astype(float))
 
