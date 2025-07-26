@@ -714,12 +714,12 @@ try:
     while ( True ):
         key, img, seg= world.render(None)
         #print(img.shape)
-        '''if tt >=100:
+        if tt >=100:
             im_id += 1
             cv2.imwrite("images/img_{}.png".format(im_id), seg) 
             tt = 0
             #print(im_id)
-        tt+=1'''
+        tt+=1
         controller.parse_events(world, key)
         if (key == 27):
             break
