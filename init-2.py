@@ -59,5 +59,5 @@ import carla
 # Connection to Carla server
 client = carla.Client('localhost', 2000)
 client.set_timeout(20) #sec
-client.load_world('Town05')
+client.load_world('Town04')
 client.reload_world()
