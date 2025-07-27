@@ -392,27 +392,47 @@ class HUD(object):
         Returns:
         tuple: Key pressed and the raw image
         """
+
+        # Check if the raw images which are the input are not None
         if(raw_image is not None):
             cv2.imshow('Raw Image {}'.format(self.name), raw_image)
             cv2.imshow('Semantic Image {}'.format(self.name), semantic_image)
             
+            # Create a mask for the lane markings in the semantic image
+            # 234 is the lane color for the lane markings that are detected
+            # in the semantic segmentation image
             mask = (semantic_image[:, :, 1] == 234).astype(float) * 255
             mask_b = (semantic_image[:, :, 1] == 234).astype(np.uint8) * 255
 
+            # Add a new dimension to the mask for compatibility with OpenCV
             mask = mask[:, :, np.newaxis]
             mask_b = mask_b[:, :, np.newaxis]
 
+            # Define a kernel for morphological operations
+            # This kernel is used for dilation to enhance the lane markings
             kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
 
+            # Apply dilation to the mask to enhance the lane markings
+            # Dilation helps to fill in gaps in the lane markings
             dilation = cv2.dilate(mask_b, kernel, iterations=1)
             dilation = dilation[:, :, np.newaxis]
 
+            # Repeat the dilation mask for all three color channels
+            # This is necessary because the original image is in color
+            # which has 3 channels
             dilation = np.repeat(dilation, 3, axis=2)
 
+            # Create an empty mask with the same dimensions as the raw image
+            # This mask will be used to create a hexagonal region of interest
             mask2 = np.zeros_like(raw_image)
 
+            # Define the hexagonal region for masking
+            # The hexagon is defined in terms of the height and width of the raw image
+            # The hexagon is positioned to cover the lower half of the image
             height, width, _ = raw_image.shape
 
+            # Define the hexagon region for masking
+            # The hexagon is defined by its vertices
             hexagon = np.array([
                 [(0, height), 
                  (0, int(height / 2) + 100),
@@ -421,15 +441,28 @@ class HUD(object):
                  (width, height)],
             ])
 
+            # Fill the hexagonal region in the mask with white color (255)
+            # This creates a mask that will be applied to the dilated image
             mask2 = cv2.fillPoly(mask2, hexagon, 255)
 
+            # Combine the dilated image (the mask created from the lane markings) with
+            # the hexagonal mask to create a masked image
+            # This operation keeps only the lane markings that are within the hexagonal region
             masked_image = cv2.bitwise_and(dilation.astype(float), mask2.astype(float))
 
+            # Repeat the mask to match the dimensions of the raw image
+            # This is necessary for visualization purposes
             mask = np.repeat(mask, 3, axis=2)
 
+            # Convert the raw image to grayscale for edge detection in an later step
+            # This is useful for visualizing the edges of the lane markings
             gray_image = cv2.cvtColor(raw_image, cv2.COLOR_BGR2GRAY)
+
+            # Perform edge detection on the semantic image
+            # This helps to highlight the edges of the lane markings
             edges = cv2.Canny(semantic_image, 100, 200)
 
+            # Render the different processed images in  separate windows
             cv2.imshow('Gray Image {}'.format(self.name), gray_image)
 
             cv2.imshow('Edge Detection Image {}'.format(self.name), edges)
@@ -438,9 +471,12 @@ class HUD(object):
             cv2.imshow('Hexagon Mask Shape {}'.format(self.name), mask2)
             cv2.imshow('Hexagon Mask in action {}'.format(self.name), masked_image)
 
+        # Wait for a key press with a timeout of 30 milliseconds
         key = cv2.waitKeyEx(30)
+        # If the key pressed is ESC (key code 27), close all OpenCV windows
         if(key == 27):
             cv2.destroyAllWindows()
+        # Return the key pressed and the masked image
         return (key), masked_image
 
 

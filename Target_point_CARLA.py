@@ -166,40 +166,59 @@ class HUD(object):
         self._info_text = []
 
 
+    # =============================================================================
+    # -- Lanes_detection function -----------------------------------------------
+    # =============================================================================
     def Lanes_detection(self, img, img_org, nwindows=50, margin=20, minipix = 5, draw_windows=False):
 
+        # Initialize arrays in order to further store the polynomial
+        # coefficients for left and right lane lines
         left_fit_ = np.empty(3)
         right_fit_ = np.empty(3)
+        # Ensure the input image is of type uint8 for further processing
         img = img.astype(np.uint8)
 
+        # Ensure the original image is of type uint8 for further processing
         img_org = img_org.astype(np.uint8)
 
+        # Apply perspective transform to get a bird's-eye view of the lane
         wraped_img = self.wrap_image(img)
 
+        # Get the histogram of the wrapped image to find the base points for left and right lanes
         histogram = self.get_hist(wraped_img)
 
+        # Make a copy of the wrapped image to use as the binary image for lane detection
         binary_wraped = wraped_img.copy()
 
+        # Find the midpoint of the histogram to separate left and right halves
         midpoint = np.int(histogram.shape[0] / 2)
+        # Find the peak in the left half of the histogram as the base for the left lane
         leftx_base = np.argmax(histogram[:midpoint])
+        # Find the peak in the right half of the histogram as the base for the right lane
         rightx_base = np.argmax(histogram[midpoint:]) + midpoint
 
+        # Set the height of each sliding window
         window_height = np.int(binary_wraped.shape[0] / nwindows)
 
+        # Identify the x and y positions of all nonzero pixels in the image
         nonzero = binary_wraped.nonzero()
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
 
+        # Current positions to be updated for each window
         leftx_current = leftx_base
         rightx_current = rightx_base
 
+        # Initialize lists to store the indices of left and right lane pixels found in each window
         left_lane_inds = []
         right_lane_inds = []
 
         # Experimental: might not work
         # out_img = np.dstack((binary_warped, binary_warped, binary_warped)) if len(binary_warped.shape) == 2 else binary_warped.copy()
 
+        # Sliding window approach to find lane pixels
         for window in range(nwindows):
+            # Define window boundaries in x and y
             win_y_low = binary_wraped.shape[0] - (window + 1) * window_height
             win_y_high = binary_wraped.shape[0] - window * window_height
             win_xleft_low = leftx_current - margin
@@ -207,38 +226,50 @@ class HUD(object):
             win_xright_low = rightx_current - margin
             win_xright_high = rightx_current + margin
 
-            good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xleft_low) & (nonzerox < win_xleft_high)).nonzero()[0]
-            good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xright_low) & (nonzerox < win_xright_high)).nonzero()[0]
+            # Identify nonzero pixels within the window for left and right lanes
+            good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) &
+                      (nonzerox >= win_xleft_low) & (nonzerox < win_xleft_high)).nonzero()[0]
+            good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) &
+                       (nonzerox >= win_xright_low) & (nonzerox < win_xright_high)).nonzero()[0]
 
+            # Append found indices to the lists
             left_lane_inds.append(good_left_inds)
             right_lane_inds.append(good_right_inds)
 
+            # Optionally draw the windows on the output image for visualization
             if draw_windows == True:
                 cv2.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high), (100, 255, 255), 3)
                 cv2.rectangle(out_img, (win_xright_low, win_y_low), (win_xright_high, win_y_high), (100, 255, 255), 3)
 
+            # If enough pixels found, recenter next window on their mean position
             if len(good_left_inds) > minipix:
                 leftx_current = np.int(np.mean(nonzerox[good_left_inds]))
             if len(good_right_inds) > minipix:
                 rightx_current = np.int(np.mean(nonzerox[good_right_inds]))
 
+        # Concatenate the indices of all left and right lane pixels found in each window
         left_lane_inds = np.concatenate(left_lane_inds)
         right_lane_inds = np.concatenate(right_lane_inds)
 
+        # Extract the x and y positions of all left and right lane pixels
         leftx = nonzerox[left_lane_inds]
         lefty = nonzeroy[left_lane_inds]
         rightx = nonzerox[right_lane_inds]
         righty = nonzeroy[right_lane_inds]
 
+        # Make a copy of the input image for drawing purposes
         out_img = np.copy(img)
 
         try:
+            # Fit a second order polynomial to each lane line pixel positions
             left_fit, res1, _, _, _ = np.polyfit(lefty, leftx, 2, full=True)
             right_fit, res2, _, _, _ = np.polyfit(righty, rightx, 2, full=True)
         except:
+            # If fitting fails, skip updating coefficients
             pass
 
         try:
+            # Store the polynomial coefficients for left and right lanes for smoothing
             self.left_a.append(left_fit[0])
             self.left_b.append(left_fit[1])
             self.left_c.append(left_fit[2])
@@ -275,10 +306,6 @@ class HUD(object):
         except:
             img_2 = out_img
             img_2_o = img_org
-
-        # ==============================================================================
-        # -- Implement the Lanes_detection function here -------------------------------
-        # ==============================================================================
 
         return img_2, img_2_o
 
