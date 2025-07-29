@@ -454,6 +454,7 @@ class HUD(object):
             cv2.imshow('Segmented Lanes {}'.format(self.name), raw_image)
             #cv2.imshow('Triangle Mask {}'.format(self.name), depth_image)
             cv2.imshow('Triangle Mask {}'.format(self.name), mask)
+            cv2.imshow('Lanes {}'.format(self.name), out_img)
 
 
         key = cv2.waitKeyEx(30)
