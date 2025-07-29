@@ -278,7 +278,7 @@ class HUD(object):
             self.right_b.append(right_fit[1])
             self.right_c.append(right_fit[2])
 
-            # Average the coefficients over the last 10 frames
+            # Average the coefficients over the last 5 frames
             left_fit_[0] = np.mean(self.left_a[-5:])
             left_fit_[1] = np.mean(self.left_b[-5:])
             left_fit_[2] = np.mean(self.left_c[-5:])
