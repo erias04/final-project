@@ -179,19 +179,36 @@ class HUD(object):
     def Lanes_detection(self,img,img_org, nwindows=40, margin=10, minpix = 1, draw_windows=False):
         #print("Detection Shape" , img.shape)
 
+        # Initialize arrays to hold the coefficients
+        # of the left and right lane lines
         left_fit_= np.empty(3)
         right_fit_ = np.empty(3)
         img = img.astype(np.uint8)
 
+
+        # Ensure the original image is in uint8 format
         img_org = img_org.astype(np.uint8)
+
+        # Convert the input image to grayscale for histogram analysis
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # Apply histogram equalization
         equ = cv2.equalizeHist(gray)
-        img = equ[:,:,np.newaxis]
-        img = np.repeat(img,3,axis=2)
+
+        # Expand the equalized grayscale image to 3 channels
+        img = equ[:, :, np.newaxis]
+        img = np.repeat(img, 3, axis=2)
+
+        # Print the shape of the equalized image for debugging
         print(equ.shape)
-        histogram = np.sum(gray[int(img.shape[0]/2):,:], axis=0)
-        #histogram = self.get_hist(img)
-        #print("histogram_shape", histogram.shape)
+
+        # Compute the histogram of the lower half of the grayscale
+        # image along the x-axis
+        histogram = np.sum(gray[int(img.shape[0]/2):, :], axis=0)
+        # Alternative: histogram = self.get_hist(img)
+        # print("histogram_shape", histogram.shape)
+
+        # Make a copy of the processed image for visualization and drawing
         out_img = np.copy(img)
 
 
@@ -201,7 +218,7 @@ class HUD(object):
         #plt.plot(histogram)
         #plt.imshow(img)
 
-            # find peaks of left and right halves
+        # find peaks of left and right halves
         midpoint = int(histogram.shape[0]/2)
         leftx_base = np.argmax(histogram[:midpoint])
         rightx_base = np.argmax(histogram[midpoint:]) + midpoint
@@ -273,7 +290,6 @@ class HUD(object):
         except:
             pass
         try:
-
                 self.left_a.append(left_fit[0])
                 self.left_b.append(left_fit[1])
                 self.left_c.append(left_fit[2])
@@ -305,22 +321,30 @@ class HUD(object):
                 #plt.plot(curves[0], ploty, color='yellow', linewidth=1)
                 #plt.plot(curves[1], ploty, color='yellow', linewidth=1)
 
+                # Calculate the fitted lane curves and their coefficients
                 curves = (left_fitx, right_fitx)
                 lanes =  (left_fit_, right_fit_)
-                curverad=self.get_curve(img, curves[0],curves[1])
+
+                # Calculate the curvature of the lanes
+                curverad = self.get_curve(img, curves[0], curves[1])
+
+                # Draw the detected lane area on the image
                 img_ = self.draw_lanes(img, curves[0], curves[1])
 
                 #img_o = self.draw_lanes(img_org, curves[0], curves[1])
 
 
+                # Create a blank image with the same shape as the input image
                 img_2 = np.zeros(img.shape)
 
+                # Overlay the detected lane area (img_) onto the lower part of the blank image (img_2)
                 img_2[int(img.shape[0]/2) + int(img.shape[0]/6):,:,:] = img_[int(img.shape[0]/2) + int(img.shape[0]/6):,:,:]
 
                 img_2_o = img_org
                 #print("ddd", img_2_o.dtype,img_2.dtype)
                 img_2 = img_2.astype(np.uint8)
 
+                # Overlay the detected lane area (img_2) onto the original image (img_2_o)
                 img_2_o = cv2.addWeighted(img_2_o, 1, img_2, 0.7, 0)
 
                 #img_2_o = np.zeros(img.shape)
